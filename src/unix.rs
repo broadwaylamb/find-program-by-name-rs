@@ -22,7 +22,7 @@ pub fn find_program_by_name_at_paths<P: AsRef<Path>>(name: &str, paths: &[P]) ->
     assert!(!name.is_empty(), "Must have a name!");
     // Use the given path verbatim if it contains any slashes; this matches
     // the behavior of sh(1) and friends.
-    if name.find('/').is_none() {
+    if name.find('/').is_some() {
         return Some(PathBuf::from(name));
     }
 
