@@ -13,7 +13,7 @@ fn set_executable(permissions: &mut fs::Permissions) {
 }
 
 #[cfg(not(unix))]
-fn set_executable(permissions: &mut fs::Permissions) {}
+fn set_executable(_permissions: &mut fs::Permissions) {}
 
 #[cfg(unix)]
 const ENV_VAR_SEPARATOR: &str = ":";

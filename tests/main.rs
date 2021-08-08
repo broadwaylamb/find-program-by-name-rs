@@ -45,8 +45,9 @@ fn create_test_tree(test_dir: &str) -> DirectoryRAII {
 #[test]
 fn test_has_slashes() {
     assert_eq!(
-        find_program_by_name_at_paths("nonexistent/file.exe", &["nonexistent_dir"]),
-        Some(PathBuf::from("nonexistent/file.exe"))
+        find_program_by_name_at_paths("nonexistent/file.exe", &["nonexistent_dir"])
+            .map_err(|e| e.kind()),
+        Ok(PathBuf::from("nonexistent/file.exe"))
     )
 }
 
@@ -64,8 +65,9 @@ fn test_has_backslashes_unix() {
                 test_dir.join("foo"),
                 test_dir.join("\\")
             ]
-        ),
-        Some(test_dir.join("\\/executab\\e"))
+        )
+        .map_err(|e| e.kind()),
+        Ok(test_dir.join("\\/executab\\e"))
     )
 }
 
@@ -73,8 +75,9 @@ fn test_has_backslashes_unix() {
 #[cfg(windows)]
 fn test_has_backslashes_windows() {
     assert_eq!(
-        find_program_by_name_at_paths("nonexistent\\file.exe", &["nonexistent_dir"]),
-        Some(PathBuf::from("nonexistent\\file.exe"))
+        find_program_by_name_at_paths("nonexistent\\file.exe", &["nonexistent_dir"])
+            .map_err(|e| e.kind()),
+        Ok(PathBuf::from("nonexistent\\file.exe"))
     )
 }
 
@@ -89,17 +92,23 @@ fn test_uses_env_path() {
     ]);
 
     assert_eq!(
-        find_program_by_name("a.exe"),
-        Some(test_dir.join("bar/a.exe"))
+        find_program_by_name("a.exe").map_err(|e| e.kind()),
+        Ok(test_dir.join("bar/a.exe"))
     );
 
-    assert_eq!(find_program_by_name("non_existent.exe"), None);
+    assert_eq!(
+        find_program_by_name("non_existent.exe").map_err(|e| e.kind()),
+        Err(io::ErrorKind::NotFound),
+    );
 
     drop(path_raii);
 
     path_raii = TemporarilySetEnvVar::path_var(&["non_existent"]);
 
-    assert_eq!(find_program_by_name("a.exe"), None);
+    assert_eq!(
+        find_program_by_name("a.exe").map_err(|e| e.kind()),
+        Err(io::ErrorKind::NotFound)
+    );
 
     drop(path_raii);
 }
@@ -116,8 +125,9 @@ fn test_not_found() {
                 test_dir.to_path_buf(),
                 test_dir.join("bar"),
             ]
-        ),
-        Some(PathBuf::from(test_dir.join("a.exe")))
+        )
+        .map_err(|e| e.kind()),
+        Ok(PathBuf::from(test_dir.join("a.exe")))
     )
 }
 
@@ -126,8 +136,9 @@ fn test_not_found() {
 fn test_ignores_non_executables() {
     let test_dir = create_test_tree("test_ignores_non_executables");
     assert_eq!(
-        find_program_by_name_at_paths("impostor.exe", &[test_dir.join("non-executables")]),
-        None
+        find_program_by_name_at_paths("impostor.exe", &[test_dir.join("non-executables")])
+            .map_err(|e| e.kind()),
+        Err(io::ErrorKind::NotFound)
     )
 }
 
@@ -143,7 +154,8 @@ fn test_appends_extension() {
                 test_dir.to_path_buf(),
                 test_dir.join("bar"),
             ]
-        ),
-        Some(test_dir.join("a.exe"))
+        )
+        .map_err(|e| e.kind()),
+        Ok(test_dir.join("a.exe"))
     )
 }

@@ -1,6 +1,7 @@
 use std::env;
 use std::ffi::CString;
 use std::fs;
+use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
@@ -18,24 +19,30 @@ use std::path::{Path, PathBuf};
 ///
 /// Returns the fully qualified path to the first `name` in `paths` if it exists, or `name`
 /// if `name` has slashes in it. Otherwise returns `None`.
-pub fn find_program_by_name_at_paths<P: AsRef<Path>>(name: &str, paths: &[P]) -> Option<PathBuf> {
+pub fn find_program_by_name_at_paths<P: AsRef<Path>>(
+    name: &str,
+    paths: &[P],
+) -> io::Result<PathBuf> {
     assert!(!name.is_empty(), "Must have a name!");
     // Use the given path verbatim if it contains any slashes; this matches
     // the behavior of sh(1) and friends.
     if name.find('/').is_some() {
-        return Some(PathBuf::from(name));
+        return Ok(PathBuf::from(name));
     }
 
     if paths.is_empty() {
         if let Ok(path_env) = env::var("PATH") {
-            return helper(name, path_env.split(':').map(AsRef::as_ref));
+            return perform_actual_search(name, path_env.split(':').map(AsRef::as_ref));
         }
     }
 
-    helper(name, paths.iter().map(AsRef::as_ref))
+    perform_actual_search(name, paths.iter().map(AsRef::as_ref))
 }
 
-fn helper<'a>(name: &str, paths: impl Iterator<Item = &'a Path>) -> Option<PathBuf> {
+fn perform_actual_search<'a>(
+    name: &str,
+    paths: impl Iterator<Item = &'a Path>,
+) -> io::Result<PathBuf> {
     let mut file_path = PathBuf::new();
     for path in paths {
         if path.as_os_str().is_empty() {
@@ -46,12 +53,12 @@ fn helper<'a>(name: &str, paths: impl Iterator<Item = &'a Path>) -> Option<PathB
         file_path.push(path);
         file_path.push(name);
         if can_execute(&file_path) {
-            return Some(file_path);
+            return Ok(file_path);
         }
-        file_path.clear(); // clear but keep the allocation
+        file_path.clear(); // erase but keep the allocation
     }
 
-    None
+    Err(io::Error::from_raw_os_error(libc::ENOENT))
 }
 
 fn can_execute<P: AsRef<Path>>(file: P) -> bool {
